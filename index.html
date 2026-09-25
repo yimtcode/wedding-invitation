@@ -223,6 +223,38 @@
     *{animation:none!important;transition:none!important;}
     .reveal{opacity:1;transform:none;}
   }
+
+  /* ---------- music ---------- */
+  #musicBtn{
+    position:fixed;right:18px;bottom:18px;z-index:80;
+    width:52px;height:52px;border:none;border-radius:50%;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 35% 30%, #a3232e, #6d131b);
+    color:var(--gold-light);
+    box-shadow:0 10px 26px -8px rgba(90,20,20,.75), 0 0 0 1px rgba(233,207,147,.45) inset;
+    -webkit-tap-highlight-color:transparent;
+    transition:transform .3s ease;
+  }
+  #musicBtn:active{transform:scale(.92);}
+  #musicBtn svg{width:24px;height:24px;fill:currentColor;}
+  #musicBtn .ring{position:absolute;inset:-5px;border-radius:50%;border:1px solid rgba(233,207,147,.55);opacity:0;transition:opacity .4s;}
+  #musicBtn.playing .ring{opacity:1;animation:spin 4.5s linear infinite;}
+  #musicBtn.playing .note{animation:bob 1.6s ease-in-out infinite;}
+  #musicBtn .badge{
+    position:absolute;top:-7px;right:-7px;background:var(--gold);color:#4a0c11;
+    font-size:10px;line-height:1;padding:4px 6px;border-radius:9px;letter-spacing:.05em;
+    font-family:var(--serif);box-shadow:0 4px 10px -3px rgba(0,0,0,.5);
+    animation:pulse 1.6s ease-in-out infinite;white-space:nowrap;
+  }
+  #musicBtn.playing .badge{display:none;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  @keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(-2px);}}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.08);opacity:.85;}}
+
+  @media (max-width:560px){
+    #musicBtn{width:46px;height:46px;right:14px;bottom:14px;}
+    #musicBtn svg{width:21px;height:21px;}
+  }
 </style>
 <noscript><style>.reveal{opacity:1!important;transform:none!important;}</style></noscript>
 </head>
@@ -450,6 +482,33 @@
     }
     tick(); setInterval(tick,1000);
   })();
+
+  /* 背景音乐：自动尝试播放 + 首次点击/触摸兜底 + 微信 WeixinJSBridge */
+  (function(){
+    var bgm=document.getElementById('bgm');
+    var btn=document.getElementById('musicBtn');
+    if(!bgm||!btn) return;
+    function mark(on){ btn.classList.toggle('playing', !!on); btn.setAttribute('aria-label', on?'暂停音乐':'播放音乐'); }
+    function play(){ var p=bgm.play(); if(p&&p.then){ p.then(function(){mark(true);}).catch(function(){mark(false);}); } else { mark(true); } }
+    bgm.addEventListener('play',function(){mark(true);});
+    bgm.addEventListener('pause',function(){mark(false);});
+    btn.addEventListener('click',function(e){ e.stopPropagation(); if(bgm.paused){ play(); } else { bgm.pause(); } });
+    /* 首次用户交互时自动播放（绕过浏览器自动播放限制） */
+    function arm(){ var go=function(){ play(); off(); }; function off(){ ['touchstart','click','scroll','keydown'].forEach(function(ev){ document.removeEventListener(ev,go); }); } ['touchstart','click','scroll','keydown'].forEach(function(ev){ document.addEventListener(ev,go,{passive:true}); }); }
+    /* 微信：WeixinJSBridge 就绪后播放 */
+    function wxPlay(){
+      if(typeof WeixinJSBridge!=='undefined'){ WeixinJSBridge.invoke('getNetworkType',{},function(){ play(); }); }
+      else { document.addEventListener('WeixinJSBridgeReady',function(){ play(); },false); arm(); }
+    }
+    window.addEventListener('load',function(){ play(); setTimeout(function(){ if(bgm.paused) arm(); }, 200); });
+    if(/micromessenger/i.test(navigator.userAgent||'')){ wxPlay(); } else { setTimeout(function(){ if(bgm.paused) arm(); }, 1200); }
+  })();
 </script>
+<audio id="bgm" src="music/bgm.wav" loop preload="auto" playsinline webkit-playsinline></audio>
+<button id="musicBtn" type="button" aria-label="播放音乐">
+  <span class="ring"></span>
+  <span class="badge">轻触播放</span>
+  <svg class="note" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
+</button>
 </body>
 </html>
