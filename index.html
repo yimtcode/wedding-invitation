@@ -483,28 +483,44 @@
     tick(); setInterval(tick,1000);
   })();
 
-  /* 背景音乐：自动尝试播放 + 首次点击/触摸兜底 + 微信 WeixinJSBridge */
+  /* 背景音乐：尽力自动播放；被浏览器/微信拦截时，首次触摸/点击即播放 */
   (function(){
     var bgm=document.getElementById('bgm');
     var btn=document.getElementById('musicBtn');
     if(!bgm||!btn) return;
+    var evs=['touchstart','touchend','click','mousedown','scroll','keydown','mousemove','pointerdown'];
     function mark(on){ btn.classList.toggle('playing', !!on); btn.setAttribute('aria-label', on?'暂停音乐':'播放音乐'); }
-    function play(){ var p=bgm.play(); if(p&&p.then){ p.then(function(){mark(true);}).catch(function(){mark(false);}); } else { mark(true); } }
+    function play(){
+      try{
+        var p=bgm.play();
+        if(p&&p.then){ p.then(function(){mark(true);}).catch(function(){mark(false);}); }
+        else { mark(true); }
+      }catch(err){ mark(false); }
+    }
     bgm.addEventListener('play',function(){mark(true);});
     bgm.addEventListener('pause',function(){mark(false);});
-    btn.addEventListener('click',function(e){ e.stopPropagation(); if(bgm.paused){ play(); } else { bgm.pause(); } });
-    /* 首次用户交互时自动播放（绕过浏览器自动播放限制） */
-    function arm(){ var go=function(){ play(); off(); }; function off(){ ['touchstart','click','scroll','keydown'].forEach(function(ev){ document.removeEventListener(ev,go); }); } ['touchstart','click','scroll','keydown'].forEach(function(ev){ document.addEventListener(ev,go,{passive:true}); }); }
-    /* 微信：WeixinJSBridge 就绪后播放 */
-    function wxPlay(){
-      if(typeof WeixinJSBridge!=='undefined'){ WeixinJSBridge.invoke('getNetworkType',{},function(){ play(); }); }
-      else { document.addEventListener('WeixinJSBridgeReady',function(){ play(); },false); arm(); }
+    btn.addEventListener('click',function(e){ e.preventDefault(); e.stopPropagation(); if(bgm.paused){ play(); } else { bgm.pause(); } });
+    /* 用户首次交互自动播放，并解除监听 */
+    function onFirst(){
+      play();
+      evs.forEach(function(ev){ document.removeEventListener(ev,onFirst,true); window.removeEventListener(ev,onFirst,true); });
     }
-    window.addEventListener('load',function(){ play(); setTimeout(function(){ if(bgm.paused) arm(); }, 200); });
-    if(/micromessenger/i.test(navigator.userAgent||'')){ wxPlay(); } else { setTimeout(function(){ if(bgm.paused) arm(); }, 1200); }
+    evs.forEach(function(ev){ document.addEventListener(ev,onFirst,true); window.addEventListener(ev,onFirst,true); });
+    /* 微信：WeixinJSBridge 就绪后尝试播放 */
+    function wxBridge(){
+      if(typeof WeixinJSBridge!=='undefined'){
+        try{ WeixinJSBridge.invoke('getNetworkType',{},function(){ play(); }); }catch(e){ play(); }
+      } else {
+        document.addEventListener('WeixinJSBridgeReady',function(){ play(); },false);
+      }
+    }
+    window.addEventListener('load',function(){ play(); });
+    window.addEventListener('pageshow',function(){ play(); });
+    if(/micromessenger/i.test(navigator.userAgent||'')) wxBridge();
+    setTimeout(play,300);
   })();
 </script>
-<audio id="bgm" src="music/bgm.wav" loop preload="auto" playsinline webkit-playsinline></audio>
+<audio id="bgm" src="music/bgm.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
 <button id="musicBtn" type="button" aria-label="播放音乐">
   <span class="ring"></span>
   <span class="badge">轻触播放</span>
