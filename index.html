@@ -484,7 +484,7 @@
   })();
 
   /* 背景音乐：尽力自动播放；被浏览器/微信拦截时，首次触摸/点击即播放 */
-  (function(){
+  function initBgm(){
     var bgm=document.getElementById('bgm');
     var btn=document.getElementById('musicBtn');
     if(!bgm||!btn) return;
@@ -518,7 +518,8 @@
     window.addEventListener('pageshow',function(){ play(); });
     if(/micromessenger/i.test(navigator.userAgent||'')) wxBridge();
     setTimeout(play,300);
-  })();
+  }
+  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded',initBgm); } else { initBgm(); }
 </script>
 <audio id="bgm" src="music/bgm.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
 <button id="musicBtn" type="button" aria-label="播放音乐">
